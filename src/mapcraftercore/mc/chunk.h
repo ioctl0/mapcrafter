@@ -35,6 +35,7 @@ class BlockStateRegistry;
 // chunk height in sections, 16 per default
 const int CHUNK_HEIGHT = 16;
 const int BIOMES_ARRAY_SIZE = 1024;
+const int BIOMES_OLD_ARRAY_SIZE = 256;
 
 /**
  * A 16x16x16 section of a chunk.
@@ -137,7 +138,7 @@ private:
 	std::vector<ChunkSection> sections;
 
 	// the biomes in this chunk, as index y * 16 + z * 4 + x
-	uint32_t biomes[BIOMES_ARRAY_SIZE];
+	std::vector<uint32_t> biomes;
 
 	// extra_data (e.g. from attributes read from NBT data, like beds) are stored in this map
 	std::unordered_map<int, uint16_t> extra_data_map;

@@ -178,18 +178,15 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 		}
 	}
 
-	if (level.hasArray<nbt::TagByteArray>("Biomes", BIOMES_ARRAY_SIZE)) {
+	if (level.hasArray<nbt::TagByteArray>("Biomes", BIOMES_ARRAY_SIZE) || level.hasArray<nbt::TagByteArray>("Biomes", BIOMES_OLD_ARRAY_SIZE)) {
 		const nbt::TagByteArray& biomes_tag = level.findTag<nbt::TagByteArray>("Biomes");
-		std::copy(biomes_tag.payload.begin(), biomes_tag.payload.end(), biomes);
-	} else if (level.hasArray<nbt::TagIntArray>("Biomes", BIOMES_ARRAY_SIZE)) {
+		std::copy(biomes_tag.payload.begin(), biomes_tag.payload.end(), std::back_inserter(biomes));
+	} else if (level.hasArray<nbt::TagIntArray>("Biomes", BIOMES_ARRAY_SIZE) || level.hasArray<nbt::TagIntArray>("Biomes", BIOMES_OLD_ARRAY_SIZE)) {
 		const nbt::TagIntArray& biomes_tag = level.findTag<nbt::TagIntArray>("Biomes");
-		std::copy(biomes_tag.payload.begin(), biomes_tag.payload.end(), biomes);
+		std::copy(biomes_tag.payload.begin(), biomes_tag.payload.end(), std::back_inserter(biomes));
 	} else if (level.hasArray<nbt::TagByteArray>("Biomes", 0)
 			|| level.hasArray<nbt::TagLongArray>("Biomes", 0)) {
-		std::fill(biomes, biomes + BIOMES_ARRAY_SIZE, 0);
-	} else if (level.hasArray<nbt::TagByteArray>("Biomes", 256) || level.hasArray<nbt::TagIntArray>("Biomes", 256)) {
-		LOG(WARNING << "Out dated chunk " << chunkpos << ": Old biome data found!";
-	}
+		biomes.clear();
 	} else {
 		LOG(WARNING) << "Corrupt chunk " << chunkpos << ": No biome data found!";
 		//level.dump(std::cout);
@@ -296,7 +293,8 @@ void Chunk::clear() {
 	sections.clear();
 	for (int i = 0; i < CHUNK_HEIGHT; i++)
 		section_offsets[i] = -1;
-	std::fill(biomes, biomes + 256, 21 /* DEFAULT_BIOME */);
+	biomes.clear();
+	biomes.resize(BIOMES_ARRAY_SIZE, 21 /* DEFAULT_BIOME */);
 }
 
 bool Chunk::hasSection(int section) const {
@@ -408,14 +406,25 @@ uint8_t Chunk::getSkyLight(const LocalBlockPos& pos) const {
 }
 
 uint8_t Chunk::getBiomeAt(const LocalBlockPos& pos) const {
-	int x = pos.x / 4;
-	int z = pos.z / 4;
-	int y = pos.y / 4;
+	if (biomes.empty()) {
+		return 0;
+	}
+
+	int x = pos.x;
+	int z = pos.z;
+	int y = pos.y;
 
 	if (rotation)
 		rotateBlockPos(x, z, rotation);
 
-	return biomes[(y * 16 + (z * 4 + x))];
+	if (biomes.size() == BIOMES_OLD_ARRAY_SIZE) {
+		return biomes[z * 16 + x];
+	} else {
+		x /= 4;
+		y /= 4;
+		z /= 4;
+		return biomes[(y * 16 + (z * 4 + x))];
+	}
 }
 
 const ChunkPos& Chunk::getPos() const {
