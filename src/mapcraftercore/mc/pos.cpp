@@ -31,28 +31,6 @@ namespace fs = boost::filesystem;
 namespace mapcrafter {
 namespace mc {
 
-RegionPos::RegionPos()
-	: x(0), z(0) {
-}
-
-RegionPos::RegionPos(int x, int z)
-	: x(x), z(z) {
-}
-
-bool RegionPos::operator==(const RegionPos& other) const {
-	return x == other.x && z == other.z;
-}
-
-bool RegionPos::operator!=(const RegionPos& other) const {
-	return !operator==(other);
-}
-
-bool RegionPos::operator<(const RegionPos& other) const {
-	if (x == other.x)
-		return z < other.z;
-	return x < other.x;
-}
-
 RegionPos RegionPos::byFilename(const std::string& filename) {
 	std::string name = BOOST_FS_FILENAME(fs::path(filename));
 
@@ -70,18 +48,9 @@ void RegionPos::rotate(int count) {
 	}
 }
 
-ChunkPos::ChunkPos()
-	: x(0), z(0) {
-}
-
-ChunkPos::ChunkPos(int x, int z)
-	: x(x), z(z) {
-}
-
-ChunkPos::ChunkPos(const BlockPos& block) {
-	x = util::floordiv(block.x, 16);
-	z = util::floordiv(block.z, 16);
-}
+ChunkPos::ChunkPos(const BlockPos& block)
+	: x(util::floordiv(block.x, 16)),
+	  z(util::floordiv(block.z, 16)) {}
 
 int ChunkPos::getLocalX() const {
 	return x % 32 < 0 ? x % 32 + 32 : x % 32;
@@ -92,20 +61,6 @@ int ChunkPos::getLocalZ() const {
 
 RegionPos ChunkPos::getRegion() const {
 	return RegionPos(util::floordiv(x, 32), util::floordiv(z, 32));
-}
-
-bool ChunkPos::operator==(const ChunkPos& other) const {
-	return x == other.x && z == other.z;
-}
-
-bool ChunkPos::operator!=(const ChunkPos& other) const {
-	return !operator ==(other);
-}
-
-bool ChunkPos::operator<(const ChunkPos& other) const {
-	if (x == other.x)
-		return z < other.z;
-	return x < other.x;
 }
 
 int ChunkPos::getRow() const {
@@ -128,62 +83,10 @@ void ChunkPos::rotate(int count) {
 	}
 }
 
-BlockPos::BlockPos()
-	: x(0), z(0), y(0) {
-}
-
-BlockPos::BlockPos(int x, int z, int y)
-	: x(x), z(z), y(y) {
-}
-
 int BlockPos::getRow() const {
 	return z - x + (CHUNK_HEIGHT*16 - y) * 4;
 }
 
-int BlockPos::getCol() const {
-	return x + z;
-}
-
-BlockPos& BlockPos::operator+=(const BlockPos& p) {
-	x += p.x;
-	z += p.z;
-	y += p.y;
-	return *this;
-}
-
-BlockPos& BlockPos::operator-=(const BlockPos& p) {
-	x -= p.x;
-	z -= p.z;
-	y -= p.y;
-	return *this;
-}
-
-BlockPos BlockPos::operator+(const BlockPos& p2) const {
-	BlockPos p = *this;
-	return p += p2;
-}
-
-BlockPos BlockPos::operator-(const BlockPos& p2) const {
-	BlockPos p = *this;
-	return p -= p2;
-}
-
-bool BlockPos::operator==(const BlockPos& other) const {
-	return x == other.x && z == other.z && y == other.y;
-}
-
-bool BlockPos::operator!=(const BlockPos& other) const {
-	return !operator==(other);
-}
-
-bool BlockPos::operator<(const BlockPos& other) const {
-	if (y == other.y) {
-		if (x == other.x)
-			return z < other.z;
-		return x > other.x;
-	}
-	return y < other.y;
-}
 
 extern const mc::BlockPos DIR_NORTH(0, -1, 0);
 extern const mc::BlockPos DIR_SOUTH(0, 1, 0);
@@ -191,10 +94,6 @@ extern const mc::BlockPos DIR_EAST(1, 0, 0);
 extern const mc::BlockPos DIR_WEST(-1, 0, 0);
 extern const mc::BlockPos DIR_TOP(0, 0, 1);
 extern const mc::BlockPos DIR_BOTTOM(0, 0, -1);
-
-LocalBlockPos::LocalBlockPos()
-	: x(0), z(0), y(0) {
-}
 
 LocalBlockPos::LocalBlockPos(int x, int z, int y)
 	: x(x), z(z), y(y) {

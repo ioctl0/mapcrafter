@@ -38,9 +38,9 @@ namespace mc {
 
 class RegionPos {
 public:
-	int x, z;
+	int x=0, z=0;
 
-	RegionPos();
+	RegionPos() = default;
 	RegionPos(int x, int z);
 
 	bool operator==(const RegionPos& other) const;
@@ -56,9 +56,9 @@ class BlockPos;
 
 class ChunkPos {
 public:
-	int x, z;
+	int x=0, z=0;
 
-	ChunkPos();
+	ChunkPos() = default;
 	ChunkPos(int x, int z);
 	ChunkPos(const BlockPos& block);
 
@@ -82,9 +82,9 @@ class LocalBlockPos;
 
 class BlockPos {
 public:
-	int x, z, y;
+	int x=0, z=0, y=0;
 
-	BlockPos();
+	BlockPos() = default;
 	BlockPos(int x, int z, int y);
 
 	int getRow() const;
@@ -104,9 +104,9 @@ extern const mc::BlockPos DIR_NORTH, DIR_SOUTH, DIR_EAST, DIR_WEST, DIR_TOP, DIR
 
 class LocalBlockPos {
 public:
-	int x, z, y;
+	int x=0, z=0, y=0;
 
-	LocalBlockPos();
+	LocalBlockPos() = default;
 	LocalBlockPos(int x, int z, int y);
 	LocalBlockPos(const BlockPos& pos);
 
@@ -122,6 +122,94 @@ std::ostream& operator<<(std::ostream& stream, const RegionPos& region);
 std::ostream& operator<<(std::ostream& stream, const ChunkPos& chunk);
 std::ostream& operator<<(std::ostream& stream, const BlockPos& block);
 std::ostream& operator<<(std::ostream& stream, const LocalBlockPos& block);
+
+//////////////////////////////////////////
+// Implementations.
+//////////////////////////////////////////
+
+inline RegionPos::RegionPos(int x, int z)
+	: x(x), z(z) {}
+
+inline bool RegionPos::operator==(const RegionPos& other) const {
+	return x == other.x && z == other.z;
+}
+
+inline bool RegionPos::operator!=(const RegionPos& other) const {
+	return !operator==(other);
+}
+
+inline bool RegionPos::operator<(const RegionPos& other) const {
+	if (x == other.x)
+		return z < other.z;
+	return x < other.x;
+}
+
+
+inline ChunkPos::ChunkPos(int x, int z)
+	: x(x), z(z) {}
+
+inline bool ChunkPos::operator==(const ChunkPos& other) const {
+	return x == other.x && z == other.z;
+}
+
+inline bool ChunkPos::operator!=(const ChunkPos& other) const {
+	return !operator ==(other);
+}
+
+inline bool ChunkPos::operator<(const ChunkPos& other) const {
+	if (x == other.x)
+		return z < other.z;
+	return x < other.x;
+}
+
+inline int BlockPos::getCol() const {
+	return x + z;
+}
+
+inline BlockPos::BlockPos(int x, int z, int y)
+	: x(x), z(z), y(y) {
+}
+
+inline BlockPos& BlockPos::operator+=(const BlockPos& p) {
+	x += p.x;
+	z += p.z;
+	y += p.y;
+	return *this;
+}
+
+inline BlockPos& BlockPos::operator-=(const BlockPos& p) {
+	x -= p.x;
+	z -= p.z;
+	y -= p.y;
+	return *this;
+}
+
+inline BlockPos BlockPos::operator+(const BlockPos& p2) const {
+	BlockPos p = *this;
+	return p += p2;
+}
+
+inline BlockPos BlockPos::operator-(const BlockPos& p2) const {
+	BlockPos p = *this;
+	return p -= p2;
+}
+
+inline bool BlockPos::operator==(const BlockPos& other) const {
+	return x == other.x && z == other.z && y == other.y;
+}
+
+inline bool BlockPos::operator!=(const BlockPos& other) const {
+	return !operator==(other);
+}
+
+inline bool BlockPos::operator<(const BlockPos& other) const {
+	if (y == other.y) {
+		if (x == other.x)
+			return z < other.z;
+		return x > other.x;
+	}
+	return y < other.y;
+}
 
 }
 }
