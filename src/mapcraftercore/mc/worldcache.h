@@ -25,6 +25,7 @@
 #include "region.h"
 #include "world.h"
 
+#include <optional>
 #include <set>
 
 namespace mapcrafter {
@@ -62,9 +63,7 @@ const int GET_LIGHT = GET_BLOCK_LIGHT | GET_SKY_LIGHT;
  * Maybe add a set of corrupt chunks/regions to dump them at the end of the rendering.
  */
 struct CacheStats {
-	CacheStats()
-			: hits(0), misses(0), region_not_found(0), not_found(0), invalid(0) {
-	}
+	CacheStats() {}
 
 	void print(const std::string& name) const {
 		std::cout << name << ":" << std::endl;
@@ -72,15 +71,17 @@ struct CacheStats {
 				  << "  misses: " << misses << std::endl
 				  << "  region_not_found: " << region_not_found << std::endl
 				  << "  not_found: " << not_found << std::endl
+				  << "  unavailable: " << unavailable << std::endl
 				  << "  invalid: " << invalid << std::endl;
 	}
 
-	int hits;
-	int misses;
+	int hits = 0;
+	int misses = 0;
 
-	int region_not_found;
-	int not_found;
-	int invalid;
+	int region_not_found = 0;
+	int not_found = 0;
+	int invalid = 0;
+	int unavailable = 0;
 };
 
 /**
@@ -89,7 +90,7 @@ struct CacheStats {
 template <typename Key, typename Value>
 struct CacheEntry {
 	Key key;
-	Value value;
+	std::optional<Value> value;
 	bool used;
 };
 
@@ -145,6 +146,7 @@ private:
 
 public:
 	WorldCache(mc::BlockStateRegistry& block_registry, const World& world);
+	~WorldCache();
 
 	const World& getWorld() const;
 
