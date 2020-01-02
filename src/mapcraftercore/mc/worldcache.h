@@ -84,25 +84,8 @@ struct CacheStats {
 	int unavailable = 0;
 };
 
-/**
- * An entry in the cache with a Key and a Value type. Used with regions and chunks.
- */
-template <typename Key, typename Value>
-struct CacheEntry {
-	Key key;
-	std::optional<Value> value;
-	bool used;
-};
-
-#define RBITS 2
-#define RWIDTH (1 << RBITS)
-#define RSIZE (RWIDTH*RWIDTH)
-#define RMASK (RSIZE-1)
-
-#define CBITS 5
-#define CWIDTH (1 << CBITS)
-#define CSIZE (CWIDTH*CWIDTH)
-#define CMASK (CSIZE-1)
+template <typename Key, typename Value, int kBits>
+class PositionCache;
 
 /**
  * This is a world cache with regions and chunks.
@@ -130,19 +113,13 @@ private:
 	mc::BlockStateRegistry& block_registry;
 	World world;
 
-	CacheEntry<RegionPos, RegionFile> regioncache[RSIZE];
-	CacheEntry<ChunkPos, Chunk> chunkcache[CSIZE];
-
-	// provisional set to keep track of broken regions/chunks
-	// we do not want to try to load them again and again
-	std::set<RegionPos> regions_broken;
-	std::set<ChunkPos> chunks_broken;
+	using RegionCache = PositionCache<RegionPos, RegionFile, 2>;
+	using ChunkCache = PositionCache<ChunkPos, Chunk, 5>;
+	std::unique_ptr<RegionCache> regioncache;
+	std::unique_ptr<ChunkCache> chunkcache;
 
 	CacheStats regionstats;
 	CacheStats chunkstats;
-
-	int getRegionCacheIndex(const RegionPos& pos) const;
-	int getChunkCacheIndex(const ChunkPos& pos) const;
 
 public:
 	WorldCache(mc::BlockStateRegistry& block_registry, const World& world);

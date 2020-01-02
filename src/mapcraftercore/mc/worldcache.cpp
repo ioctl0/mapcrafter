@@ -23,16 +23,47 @@
 
 namespace mapcrafter {
 namespace mc {
-namespace {
-template <typename T>
-T* ToPointer(std::optional<T>& opt) {
-	if (opt.has_value()) {
-		return &opt.value();
-	} else {
-		return nullptr;
+
+template <typename Key, typename Value, int kBits>
+class PositionCache {
+private:
+	static constexpr int kWidth = 1 << kBits;
+	static constexpr int kNumBuckets = kWidth * kWidth;
+
+	struct Bucket {
+		static constexpr int kDefaultValue = std::numeric_limits<int>::max();
+		Key key{kDefaultValue, kDefaultValue};
+		std::unique_ptr<Value> value;
+	};
+
+	std::array<Bucket, kNumBuckets> data;
+
+	static constexpr int IndexForKey(const Key& key) {
+		constexpr uint32_t kMask = static_cast<uint32_t>(kWidth) - 1;
+	    return ((key.x & kMask) << kBits) | (key.z & kMask);
 	}
-}
-}  // namespace
+
+	std::string DebugString(const Key& key) {
+		return std::to_string(key.x) + "," + std::to_string(key.z);
+	}
+
+public:
+	bool Get(const Key& key, Value** value) {
+		Bucket& bucket = data[IndexForKey(key)];
+		if (bucket.key == key) {
+			*value = bucket.value.get();
+			return true;
+		} else {
+			return false;
+		}
+	}
+	void Put(const Key& key, std::unique_ptr<Value> value) {
+		Bucket& bucket = data[IndexForKey(key)];
+		bucket.key = key;
+		bucket.value = std::move(value);
+	}
+};
+
 
 Block::Block()
 //	: Block(mc::BlockPos(0, 0, 0), 0, 0) { /* gcc 4.4 being stupid :/ */
@@ -46,12 +77,10 @@ Block::Block(const mc::BlockPos& pos, uint16_t id)
 }
 
 WorldCache::WorldCache(mc::BlockStateRegistry& block_registry, const World& world)
-	: block_registry(block_registry), world(world) {
-	for (int i = 0; i < RSIZE; i++)
-		regioncache[i].used = false;
-	for (int i = 0; i < CSIZE; i++)
-		chunkcache[i].used = false;
-}
+	: block_registry(block_registry),
+	  world(world),
+	  regioncache(std::make_unique<RegionCache>()),
+	  chunkcache(std::make_unique<ChunkCache>()) {}
 
 WorldCache::~WorldCache() {
 	regionstats.print("Region Cache");
@@ -62,112 +91,67 @@ const World& WorldCache::getWorld() const {
 	return world;
 }
 
-/**
- * Calculates the position of a region position in the cache.
- */
-int WorldCache::getRegionCacheIndex(const RegionPos& pos) const {
-	return (((pos.x + 4096) & RMASK) * RWIDTH + (pos.z + 4096)) & RMASK;
-}
-
-/**
- * Calculates the position of a chunk position in the cache.
- */
-int WorldCache::getChunkCacheIndex(const ChunkPos& pos) const {
-	//                4096*32
-	return (((pos.x + 131072) & CMASK) * CWIDTH + (pos.z + 131072)) & CMASK;
-}
-
 RegionFile* WorldCache::getRegion(const RegionPos& pos) {
-	CacheEntry<RegionPos, RegionFile>& entry = regioncache[getRegionCacheIndex(pos)];
-
-	// check if region is already in cache
-	if (entry.used && entry.key == pos) {
+	RegionFile* region_ptr;
+	if (regioncache->Get(pos, &region_ptr)) {
 		regionstats.hits++;
-		return ToPointer(entry.value);
+		return region_ptr;
 	}
 
-	// if not try to load the region
-	// but make sure we did not already try to load the region file and it was broken
-	if (regions_broken.count(pos)) {
-		regionstats.invalid++;
-		return nullptr;
-	}
-
-	entry.value = RegionFile();
+	auto region = std::make_unique<RegionFile>();
 	// region does not exist, region in cache was not modified
-	if (!world.getRegion(pos, *entry.value)) {
-		entry.used = true;
-		entry.key = pos;
-		entry.value = std::nullopt;
+	if (!world.getRegion(pos, *region)) {
+		regioncache->Put(pos, nullptr);
 		regionstats.region_not_found++;
 		return nullptr;
 	}
 
-	if (!entry.value->read()) {
-		// the region is not valid, region in cache was probably modified
-		entry.used = false;
-		// remember this region as broken and do not try to load it again
-		regions_broken.insert(pos);
+	if (!region->read()) {
+		regioncache->Put(pos, nullptr);
 		regionstats.invalid++;
 		return nullptr;
 	}
 
-	entry.used = true;
-	entry.key = pos;
 	regionstats.misses++;
-	return ToPointer(entry.value);
+	region_ptr = region.get();
+	regioncache->Put(pos, std::move(region));
+	return region_ptr;
 }
 
 Chunk* WorldCache::getChunk(const ChunkPos& pos) {
-	CacheEntry<ChunkPos, Chunk>& entry = chunkcache[getChunkCacheIndex(pos)];
-	// check if chunk is already in cache
-	if (entry.used && entry.key == pos) {
+	Chunk* chunk_ptr;
+	if (chunkcache->Get(pos, &chunk_ptr)) {
 		chunkstats.hits++;
-		return ToPointer(entry.value);
+		return chunk_ptr;
 	}
 
 	// if not try to get the region of the chunk from the cache
 	RegionFile* region = getRegion(pos.getRegion());
 	if (region == nullptr) {
-		entry.used = true;
-		entry.value = std::nullopt;
-		entry.key = pos;
 		chunkstats.region_not_found++;
 		return nullptr;
 	}
 
-	// then try to load the chunk
-	// but make sure we did not already try to load the chunk and it was broken
-	if (chunks_broken.count(pos)) {
-		chunkstats.invalid++;
-		return nullptr;
-	}
-
-	entry.value = Chunk();
-	int status = region->loadChunk(pos, block_registry, *entry.value);
+	auto chunk = std::make_unique<Chunk>();
+	int status = region->loadChunk(pos, block_registry, *chunk);
 	// the chunk does not exist, chunk in cache was not modified
 	if (status == RegionFile::CHUNK_DOES_NOT_EXIST) {
-		entry.used = true;
-		entry.value = std::nullopt;
-		entry.key = pos;
+		chunkcache->Put(pos, nullptr);
 		chunkstats.not_found++;
 		return nullptr;
 	}
 
 	if (status != RegionFile::CHUNK_OK) {
-		chunkstats.unavailable++;
+		chunkcache->Put(pos, nullptr);
 		// the chunk is not valid, chunk in cache was probably modified
-		entry.used = false;
-		// remember this chunk as broken and do not try to load it again
-		chunks_broken.insert(pos);
 		chunkstats.invalid++;
 		return nullptr;
 	}
 
-	entry.used = true;
-	entry.key = pos;
 	chunkstats.misses++;
-	return ToPointer(entry.value);
+	chunk_ptr = chunk.get();
+	chunkcache->Put(pos, std::move(chunk));
+	return chunk_ptr;
 }
 
 Block WorldCache::getBlock(const mc::BlockPos& pos, const mc::Chunk* chunk, int get) {
