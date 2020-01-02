@@ -189,6 +189,7 @@ bool Chunk::readNBT(mc::BlockStateRegistry& block_registry, const char* data, si
 		biomes.clear();
 	} else {
 		LOG(WARNING) << "Corrupt chunk " << chunkpos << ": No biome data found!";
+		biomes.clear();
 		//level.dump(std::cout);
 	}
 
@@ -294,7 +295,6 @@ void Chunk::clear() {
 	for (int i = 0; i < CHUNK_HEIGHT; i++)
 		section_offsets[i] = -1;
 	biomes.clear();
-	biomes.resize(BIOMES_ARRAY_SIZE, 21 /* DEFAULT_BIOME */);
 }
 
 bool Chunk::hasSection(int section) const {
@@ -407,7 +407,7 @@ uint8_t Chunk::getSkyLight(const LocalBlockPos& pos) const {
 
 uint8_t Chunk::getBiomeAt(const LocalBlockPos& pos) const {
 	if (biomes.empty()) {
-		return 0;
+		return 21; // default biome.
 	}
 
 	int x = pos.x;
