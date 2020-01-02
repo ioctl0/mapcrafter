@@ -121,13 +121,14 @@ void MultiThreadingDispatcher::dispatch(const renderer::RenderContext& context,
 		return;
 
 	int jobs = 0;
-	for (auto tile_it = tiles.begin(); tile_it != tiles.end(); ++tile_it)
-		if (tile_it->getDepth() == context.tile_set->getDepth() - 2) {
+	for (auto& tile : tiles) {
+		if (tile.getDepth() == context.tile_set->getDepth() - 2) {
 			renderer::RenderWork work;
-			work.tiles.insert(*tile_it);
+			work.tiles.insert(tile);
 			manager.addWork(work);
 			jobs++;
 		}
+	}
 
 	//int render_tiles = context.tile_set->getRequiredRenderTilesCount();
 	//LOG(INFO) << thread_count << " threads will render " << render_tiles << " render tiles.";
@@ -142,15 +143,14 @@ void MultiThreadingDispatcher::dispatch(const renderer::RenderContext& context,
 	renderer::RenderWorkResult result;
 	while (manager.getResult(result)) {
 		progress->setValue(progress->getValue() + result.tiles_rendered);
-		for (auto tile_it = result.render_work.tiles.begin();
-				tile_it != result.render_work.tiles.end(); ++tile_it) {
-			rendered_tiles.insert(*tile_it);
-			if (*tile_it == renderer::TilePath()) {
+		for (auto tile : result.render_work.tiles) {
+			rendered_tiles.insert(tile);
+			if (tile == renderer::TilePath()) {
 				manager.setFinished();
 				continue;
 			}
 
-			renderer::TilePath parent = tile_it->parent();
+			renderer::TilePath parent = tile.parent();
 			bool childs_rendered = true;
 			for (int i = 1; i <= 4; i++)
 				if (context.tile_set->isTileRequired(parent + i)
