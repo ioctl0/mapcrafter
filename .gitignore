@@ -8,8 +8,6 @@ cmake_install.cmake
 install_manifest.txt
 Makefile
 
-!doc/Makefile
-
 *.o
 *.a
 gmon.out
